@@ -30,11 +30,11 @@ critical.
 
 | Metric | Acceptable Low Score Scenario | Critical Low Score Scenario | Action Required |
 |---|---|---|---|
-| Faithfulness | | | |
-| Answer Relevance | | | |
-| Context Recall | | | |
-| Context Precision | | | |
-| Completeness | | | |
+| Faithfulness | Câu trả lời từ chối đúng một câu hỏi ngoài phạm vi nên rất ít token trùng context. | Câu trả lời về deadline, học phí hoặc privacy có claim không được context hỗ trợ. | Block hoặc human review case rủi ro; kiểm tra retrieved context và thêm grounding/citation guardrail. |
+| Answer Relevance | Câu hỏi mơ hồ và assistant hỏi lại để làm rõ thay vì đoán ý định. | Assistant trả lời một policy khác, không giải quyết yêu cầu của sinh viên. | Kiểm tra intent/routing, viết lại prompt và thêm test cases cho intent đó. |
+| Context Recall | Câu hỏi chỉ cần một fact và answer vẫn có đủ fact cần thiết dù không lấy mọi chunk gold. | Retriever bỏ chunk chứa deadline, điều kiện eligibility hoặc exception cần để trả lời đúng. | Cải thiện query, chunking, top-k hoặc index; đo lại recall và completeness. |
+| Context Precision | Có một vài chunk noise ở cuối ranking nhưng evidence chính đứng đầu và answer vẫn đúng. | Noise đứng trước evidence hoặc lấn át context, làm model trả lời sai/thiếu. | Thêm reranking/filtering và review query để đưa evidence liên quan lên đầu. |
+| Completeness | Người dùng chỉ hỏi một phần hẹp và answer cố ý ngắn, không cần nêu mọi chi tiết gold. | Answer bỏ bước hành động, mức phí, deadline, điều kiện hoặc ngoại lệ quan trọng. | Bổ sung evidence bị thiếu, yêu cầu prompt kiểm tra điều kiện/ngoại lệ, rồi benchmark lại. |
 
 ### Exercise 1.2 — Bias trong LLM-as-a-Judge
 
@@ -46,15 +46,15 @@ Ba bias thường gặp:
 
 **Câu 1: Thiết kế experiment phát hiện position bias với ít nhất hai conditions.**
 
-> *Câu trả lời:*
+> Dùng cùng một tập câu hỏi và các cặp answer có chất lượng đã được human label. Chấm ở Condition A với thứ tự `Answer A → Answer B`, rồi ở Condition B đổi thành `Answer B → Answer A`; mỗi condition nên chạy nhiều lần hoặc qua nhiều judge seeds. So sánh tỷ lệ answer ở vị trí đầu được điểm cao hơn và mức thay đổi điểm của cùng một answer sau khi đổi vị trí. Nếu vị trí đầu thắng có hệ thống dù chất lượng không đổi, judge có position bias.
 
 **Câu 2: Làm thế nào giảm verbosity bias bằng rubric design?**
 
-> *Câu trả lời:*
+> Rubric phải chấm các claim bắt buộc, tính đúng đắn, evidence, điều kiện/ngoại lệ và khả năng hành động thay vì độ dài. Nêu rõ: không thưởng diễn giải lặp lại, thông tin ngoài phạm vi hoặc ví dụ không cần thiết; một answer ngắn nhưng đủ và có evidence có thể đạt điểm 5. Có thể đặt giới hạn số claim được xét và trừ điểm cho claim không được hỗ trợ.
 
 **Câu 3: Tại sao cần calibrate LLM judge với human labels?**
 
-> *Câu trả lời:*
+> Human labels là chuẩn tham chiếu để kiểm tra judge có đang áp dụng rubric đúng không. Calibration phát hiện judge quá dễ, quá gắt, thiên vị văn phong/model hoặc đánh giá sai các case privacy và exception; từ đó có thể chỉnh rubric, prompt judge hoặc threshold trước khi dùng tự động.
 
 ### Exercise 1.3 — Evaluation trong CI/CD
 
@@ -62,13 +62,13 @@ Ba bias thường gặp:
 
 | Metric | Threshold | Lý do |
 |---|---:|---|
-| Faithfulness | | |
-| Answer Relevance | | |
-| Completeness | | |
+| Faithfulness | 0.80 | Student Services có thông tin chính sách, deadline và privacy; claim không grounded có rủi ro cao nên phải chặn release nếu trung bình giảm dưới mức Good. |
+| Answer Relevance | 0.70 | Hệ thống phải trả lời đúng intent; ngưỡng này cho phép một số câu hỏi mơ hồ cần clarification nhưng vẫn chặn lệch chủ đề trên diện rộng. |
+| Completeness | 0.70 | Câu trả lời cần giữ các bước, điều kiện và exception cốt lõi; score thấp hơn cho thấy trải nghiệm sinh viên dễ bị thiếu thông tin quan trọng. |
 
 **Câu 2: Khi nào dùng offline evaluation, online evaluation và human review?**
 
-> *Câu trả lời:*
+> **Offline evaluation:** chạy trên golden dataset trước mỗi thay đổi code, prompt, model, retriever hoặc trước release để so sánh với baseline. **Online evaluation:** theo dõi sau deploy trên traffic thật, feedback, failure rate, latency và các dấu hiệu drift; không dùng dữ liệu nhạy cảm ngoài chính sách privacy. **Human review:** áp dụng cho privacy/security, financial aid hoặc payment, appeals/disciplinary matters, câu hỏi high-impact, case judge không chắc chắn và mẫu dùng để calibrate LLM judge.
 
 ---
 
