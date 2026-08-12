@@ -284,19 +284,28 @@ verbosity bias và self-preference bằng cách nào?
 Chỉ làm sau khi hoàn thành 3.1–3.3. Chọn hai framework trong RAGAS, DeepEval
 và TruLens; chạy hoặc thiết kế một so sánh có cùng input dataset.
 
-| Tiêu chí | Framework 1: ____ | Framework 2: ____ |
+| Tiêu chí | Framework 1: RAGAS | Framework 2: DeepEval |
 |---|---|---|
-| Setup complexity | | |
-| Metrics available | | |
-| CI/CD integration | | |
-| Kết quả trên cùng dataset | | |
-| Insight rút ra | | |
+| Setup complexity | Cần dataset dạng `question`/`response`/`reference`/`retrieved_contexts`, LLM+embeddings và provider integration; import hiện bị chặn bởi dependency thiếu `langchain_community.chat_models.vertexai`. | Cần tạo `LLMTestCase`, khai báo metric objects và chọn judge model; package chưa có trong environment hiện tại. |
+| Metrics available | Faithfulness, Answer Relevancy, Context Recall và Context Precision theo LLM/embedding evaluation. | Faithfulness, Answer Relevancy, Hallucination và các pytest-native assertions; có thể đặt threshold theo từng test. |
+| CI/CD integration | Phù hợp offline benchmark, lưu kết quả aggregate/trace rồi so sánh với baseline. | Phù hợp nhất với CI/CD vì `assert_test()` biến metric threshold thành pytest failure trực tiếp. |
+| Kết quả trên cùng dataset | Thiết kế chạy trên 20 record trong `golden_dataset.json` + `actual_answers.json`; không báo điểm vì RAGAS không import được trong môi trường hiện tại. | Thiết kế dùng đúng 20 record và cùng LLM judge/reference; chưa chạy vì DeepEval chưa được cài. |
+| Insight rút ra | Phù hợp khi cần diagnosis RAG end-to-end và so sánh retrieval metrics giữa các run. | Phù hợp khi cần quality gate rõ ràng theo từng case trong pull request/CI. |
 
 - Scores có nhất quán không?
 - Framework nào strict hơn và vì sao?
 - Hai framework có tìm ra cùng failure cases không?
 
-> *Phân tích:*
+> Hai framework sẽ nhận cùng mapping input: `question` từ golden dataset,
+> `actual_answer` từ artifact, `expected_answer` làm reference và
+> `retrieved_contexts` làm retrieval trace. Vì RAGAS không import được do
+> thiếu dependency và DeepEval chưa được cài, không có điểm framework thật để
+> khẳng định scores nhất quán hay framework nào strict hơn; không được suy ra
+> điều đó từ heuristic word-overlap của lab. Thiết kế này dự kiến dùng RAGAS
+> để phân tích offline các metrics retrieval/answer, còn DeepEval đặt threshold
+> per-case trong pytest để block CI. Sau khi môi trường được cài hoàn chỉnh,
+> cần chạy cả hai với cùng model judge, temperature 0 và cùng 20 records; so
+> sánh mean metric, danh sách failures và human labels trước khi chọn gate.
 
 ### Exercise 3.5 — Retrieval Reranking (Bonus +5)
 
@@ -311,20 +320,27 @@ thay đổi Context Recall hay không.
 
 | ID | Recall before | Recall after | Precision before | Precision after | Delta Precision |
 |---|---:|---:|---:|---:|---:|
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| | | | | | |
-| **Avg** | | | | | |
+| E04 | 1.000 | 1.000 | 0.917 | 1.000 | +0.083 |
+| M06 | 0.900 | 0.900 | 1.000 | 0.950 | -0.050 |
+| A01 | 0.905 | 0.905 | 0.917 | 0.806 | -0.111 |
+| A02 | 0.929 | 0.929 | 0.700 | 0.833 | +0.133 |
+| A03 | 0.833 | 0.833 | 0.700 | 0.700 | +0.000 |
+| **Avg** | **0.913** | **0.913** | **0.847** | **0.858** | **+0.011** |
 
 **Tại sao Recall dự kiến không đổi?**
 
-> *Câu trả lời:*
+> Context Recall đo coverage trên union của các chunks. Reranker chỉ đổi thứ
+> tự, không thêm hoặc xóa chunks, nên union và Recall không đổi (thử nghiệm:
+> 0.913 trước và sau trên năm cases).
 
 **Khi nào reranking không đủ và cần sửa retriever/query/chunking?**
 
-> *Câu trả lời:*
+> Reranking không đủ khi evidence cần thiết không có trong top-k (Recall thấp),
+> hoặc lexical overlap không phản ánh intent/semantic relevance. Kết quả thật
+> cho thấy M06 và A01 giảm Precision, nên không nên rollout lexical reranker
+> mù quáng. Khi đó cần sửa query rewriting, BM25/dense retrieval, metadata
+> filters, chunk boundary/size hoặc dùng cross-encoder/LLM reranker rồi đánh
+> giá lại bằng Recall, Precision và answer-side metrics.
 
 ---
 
